@@ -1,9 +1,9 @@
 # lutron-integration
-linux service for controlling Lutron Caseta Wireless Smart Bridge 2 Pro over telnet
+Linux service for controlling Lutron Caseta Wireless Smart Bridge 2 Pro over telnet
 
-planned features:
-* json control api
-  * abstraction of lutron protocol into something more robust
+Planned features:
+* JSON control API (via SSH)
+  * abstraction of Lutron telnet protocol into something more robust and secure
 * smarter schedules
   * conditional actions
     * example: only dim lights if they are at a higher level

@@ -1,0 +1,17 @@
+{
+  "smartBridge": {
+    "address": "x.x.x.x",
+    "port": 23,
+    "user": "lutron",
+    "password": "integration",
+    "deviceMap": {}
+  },
+  "server": {
+    "listen": "0.0.0.0",
+    "port": 8765,
+    "maxConnections": 16,
+    "keyHost": "demo.key",
+    "keyRSA": "demo.rsa",
+    "keyDSA": "demo.dsa"
+  }
+}

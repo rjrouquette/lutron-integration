@@ -1,0 +1,28 @@
+[Unit]
+Description=Lutron Caseta Wireless Integration Service
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=lutron-integration
+
+LimitCORE=infinity
+LimitNOFILE=4096
+
+Restart=on-failure
+RestartSec=10
+StartLimitInterval=5
+StartLimitBurst=3
+
+BlockIOAccounting=yes
+CPUAccounting=yes
+MemoryAccounting=yes
+
+StandardOutput=journal
+StandardError=journal
+
+ExecStart=/opt/lutron-integration/bin/lutron-integration /opt/lutron-integration/etc/lutron-integration.json
+
+[Install]
+WantedBy=multi-user.target

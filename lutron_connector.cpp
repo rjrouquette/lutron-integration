@@ -4,10 +4,10 @@
 
 #include <cstring>
 #include <netinet/in.h>
-#include <iostream>
 #include <netdb.h>
 #include <zconf.h>
 #include "lutron_connector.h"
+#include "logging.h"
 
 static const char promptLogin[] = "login: ";
 static const char promptPassword[] = "password: ";
@@ -34,6 +34,8 @@ LutronConnector::LutronConnector(const char *host, int port, const char *user, c
     ready = false;
     connected = false;
     mutex = PTHREAD_MUTEX_INITIALIZER;
+    condSend = PTHREAD_COND_INITIALIZER;
+    condResponse = PTHREAD_COND_INITIALIZER;
 }
 
 LutronConnector::~LutronConnector() {
@@ -79,7 +81,7 @@ bool LutronConnector::connect() {
     // create network socket
     sockfd = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if(sockfd < 0) {
-        std::cerr << "[LutronConnector::connect()] failed to create network socket" << std::endl;
+        log_error("smart bridge connect() failed to create network socket");
         pthread_mutex_unlock(&mutex);
         return false;
     }
@@ -94,7 +96,7 @@ bool LutronConnector::connect() {
         addr.sin_port = htons((uint16_t)port);
     }
     else {
-        std::cerr << "[LutronConnector::connect()] failed to resolve network address" << std::endl;
+        log_error("smart bridge connect() failed to resolve network address");
         close(sockfd);
         pthread_mutex_unlock(&mutex);
         return false;
@@ -103,7 +105,7 @@ bool LutronConnector::connect() {
     // connect to remote host
     auto serv_addr = (const struct sockaddr *) &addr;
     if (::connect(sockfd, serv_addr, sizeof(struct sockaddr_in)) < 0) {
-        std::cerr << "[LutronConnector::connect()] failed to connect to smart bridge " << hostname << ":" << port << std::endl;
+        log_error("smart bridge connect() failed to connect to smart bridge %s:%d", hostname, port);
         close(sockfd);
         pthread_mutex_unlock(&mutex);
         return false;
@@ -147,7 +149,7 @@ void* LutronConnector::doRX(void *context) {
         } else if (rs == 0) {
             break;
         } else {
-            std::cerr << "[LutronConnector] recv() failed: " << strerror(errno) << std::endl;
+            log_error("smart bridge recv() failed: %s", strerror(errno));
             break;
         }
     }
@@ -200,7 +202,7 @@ void LutronConnector::telnet_event(telnet_t *telnet, telnet_event_t *event, void
             /* error */
 
         case TELNET_EV_ERROR:
-            std::cerr << "[LutronConnector] telnet error: " << event->error.msg << std::endl;
+            log_error("smart bridge telnet error: %s", event->error.msg);
             ctx->disconnect();
 
         default:
@@ -215,10 +217,10 @@ void LutronConnector::send(const char *data, size_t len) {
     /* send data */
     while (len > 0) {
         if ((rs = ::send(sockfd, data, len, 0)) == -1) {
-            std::cerr << "[LutronConnector] send() failed: " << strerror(errno) << std::endl;
+            log_error("smart bridge send() failed: %s", strerror(errno));
             disconnect();
         } else if (rs == 0) {
-            std::cerr << "[LutronConnector] send() unexpectedly returned zero" << std::endl;
+            log_error("smart bridge send() unexpectedly returned zero");
             disconnect();
         }
 
@@ -231,26 +233,26 @@ void LutronConnector::send(const char *data, size_t len) {
 void LutronConnector::recv(const char *data, size_t len) {
     if(doLogin) {
         if(len != sizeof(promptLogin)-1 || strncmp(data, promptLogin, len) != 0) {
-            std::cerr << "[LutronConnector] login prompt not received" << std::endl;
+            log_error("smart bridge login prompt not received");
             disconnect();
             return;
         }
         telnet_send(telnet, username, strlen(username));
         telnet_send(telnet, "\r\n", 2);
         doLogin = false;
-        std::cerr << "[LutronConnector] login sent" << std::endl;
+        log_notice("smart bridge login sent");
         return;
     }
     if(doPassword) {
         if(len != sizeof(promptPassword)-1 || strncmp(data, promptPassword, len) != 0) {
-            std::cerr << "[LutronConnector] password prompt not received" << std::endl;
+            log_error("smart bridge password prompt not received");
             disconnect();
             return;
         }
         telnet_send(telnet, password, strlen(password));
         telnet_send(telnet, "\r\n", 2);
         doPassword = false;
-        std::cerr << "[LutronConnector] password sent" << std::endl;
+        log_notice("smart bridge password sent");
         return;
     }
 
@@ -263,11 +265,11 @@ void LutronConnector::recv(const char *data, size_t len) {
 
         temp.assign(data, next);
         if(temp == promptLogin) {
-            std::cerr << "[LutronConnector] login rejected" << std::endl;
+            log_error("smart bridge login rejected");
             disconnect();
         }
         else if(temp == promptCommand) {
-            std::cerr << "[LutronConnector] ready" << std::endl;
+            log_debug("smart bridge ready");
 
             // notify any blocked senders
             pthread_mutex_lock(&mutexSend);
@@ -276,7 +278,10 @@ void LutronConnector::recv(const char *data, size_t len) {
             pthread_mutex_unlock(&mutexSend);
         }
         else {
-            std::cerr << "[LutronConnector] recv " << temp << std::endl;
+            pthread_mutex_lock(&mutexSend);
+            pthread_cond_signal(&condResponse);
+            pthread_mutex_unlock(&mutexSend);
+            log_debug("smart bridge recv %s", temp.c_str());
             if(callback) (*callback)(temp.c_str());
         }
 
@@ -302,9 +307,10 @@ bool LutronConnector::sendCommand(const char *cmd) {
         return false;
     }
 
-    std::cerr << "[LutronConnector] send " << cmd << std::endl;
+    log_debug("smart bridge send %s", cmd);
     telnet_send(telnet, cmd, strlen(cmd));
     telnet_send(telnet, "\r\n", 2);
+    pthread_cond_wait(&condResponse, &mutexSend);
 
     pthread_mutex_unlock(&mutexSend);
     return true;

@@ -25,7 +25,7 @@ private:
     bool joinRX, doLogin, doPassword, ready, connected;
     pthread_t threadRX;
     pthread_mutex_t mutex, mutexSend;
-    pthread_cond_t condSend;
+    pthread_cond_t condSend, condResponse;
     callback_t callback;
 
     static void * doRX(void *context);

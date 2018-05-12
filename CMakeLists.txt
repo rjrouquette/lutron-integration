@@ -10,6 +10,12 @@ set(
         lutron_connector.h
         libtelnet.c
         libtelnet.h
+        room.cpp
+        room.h
+        device.cpp
+        device.h
+        logging.cpp
+        logging.h
 )
 
 add_executable(

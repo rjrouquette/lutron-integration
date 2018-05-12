@@ -1,11 +1,4 @@
 {
-  "smartBridge": {
-    "host": "192.168.1.207",
-    "port": 23,
-    "user": "lutron",
-    "password": "integration",
-    "deviceMap": {}
-  },
   "server": {
     "listen": "0.0.0.0",
     "port": 8765,
@@ -14,5 +7,118 @@
     "keyRSA": "demo.rsa",
     "keyDSA": "demo.dsa",
     "authorizedKeys": {}
-  }
+  },
+  "smartBridge": {
+    "host": "192.168.1.207",
+    "port": 23,
+    "user": "lutron",
+    "password": "integration"
+  },
+  "devices": [
+    {
+      "id": 1,
+      "name": "smart_bridge",
+      "description": "Smart Bridge",
+      "type": "smart_bridge",
+      "room": null,
+      "scenes": [
+        {
+          "id": 1,
+          "name": "arriving_home",
+          "description": "Arriving Home"
+        },{
+          "id": 2,
+          "name": "leaving_home",
+          "description": "Leaving Home"
+        },{
+          "id": 3,
+          "name": "emergency",
+          "description": "Emergency"
+        }
+      ]
+    },{
+      "id": 4,
+      "name": "living_room_lamps",
+      "description": "Table Lamps",
+      "type": "plugin_dimmer",
+      "room": "living_room"
+    },{
+      "id": 3,
+      "name": "kitchen_pendant",
+      "description": "Pendant Lights",
+      "type": "wall_dimmer",
+      "room": "kitchen"
+    },{
+      "id": 2,
+      "name": "kitchen_ceiling",
+      "description": "Ceiling Lights",
+      "type": "wall_dimmer",
+      "room": "kitchen"
+    },{
+      "id": 5,
+      "name": "hallway_ceiling",
+      "description": "Ceiling Light",
+      "type": "wall_dimmer",
+      "room": "hallway"
+    },{
+      "id": 6,
+      "name": "attic_lights",
+      "description": "Lights",
+      "type": "wall_switch",
+      "room": "attic"
+    },{
+      "id": 7,
+      "name": "living_room_lamps_pico",
+      "description": "Table Lamps Remote",
+      "type": "pico_remote",
+      "room": "living_room",
+      "buttons": [ 2, 4, 5, 6]
+    },{
+      "id": 8,
+      "name": "kitchen_pendant_pico",
+      "description": "Pendant Lights Remote",
+      "type": "pico_remote",
+      "room": "kitchen",
+      "buttons": [ 2, 4, 5, 6]
+    },{
+      "id": 9,
+      "name": "kitchen_ceiling_pico",
+      "description": "Ceiling Lights Remote",
+      "type": "pico_remote",
+      "room": "kitchen",
+      "buttons": [ 2, 4, 5, 6]
+    },{
+      "id": 10,
+      "name": "master_bedroom_lamp",
+      "description": "Table Lamp",
+      "type": "plugin_dimmer",
+      "room": "master_bedroom",
+      "buttons": [ 2, 4, 5, 6]
+    },{
+      "id": 11,
+      "name": "master_bedroom_lamp_pico",
+      "description": "Table Lamp Remote",
+      "type": "pico_remote",
+      "room": "master_bedroom",
+      "buttons": [ 2, 3, 4, 5, 6]
+    }
+  ],
+  "rooms": [
+    {
+      "name": "kitchen",
+      "description": "Kitchen"
+    },{
+      "name": "living_room",
+      "description": "Living Room"
+    },{
+      "name": "master_bedroom",
+      "description": "Master Bedroom"
+    },{
+      "name": "hallway",
+      "description": "Hallway"
+    },{
+      "name": "attic",
+      "description": "Attic"
+    }
+  ]
 }

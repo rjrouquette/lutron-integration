@@ -1,6 +1,6 @@
 {
   "smartBridge": {
-    "address": "x.x.x.x",
+    "host": "192.168.1.207",
     "port": 23,
     "user": "lutron",
     "password": "integration",
@@ -12,6 +12,7 @@
     "maxConnections": 16,
     "keyHost": "demo.key",
     "keyRSA": "demo.rsa",
-    "keyDSA": "demo.dsa"
+    "keyDSA": "demo.dsa",
+    "authorizedKeys": {}
   }
 }

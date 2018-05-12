@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.5)
 project(lutron_integration)
 
 set(CMAKE_CXX_STANDARD 11)
@@ -6,6 +6,10 @@ set(CMAKE_CXX_STANDARD 11)
 set(
         SOURCE_FILES
         main.cpp
+        lutron_connector.cpp
+        lutron_connector.h
+        libtelnet.c
+        libtelnet.h
 )
 
 add_executable(

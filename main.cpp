@@ -12,6 +12,10 @@ LutronConnector *lutronBridge;
 bool loadConfiguration(json_object *config);
 bool loadConfigurationBridge(json_object *config);
 
+void lutronMessage(const char *msg) {
+    std::cout << "RX: " << msg << std::endl;
+}
+
 int main(int argc, char **argv) {
     if(argc != 2) {
         std::cerr << "lutron-integration <config_json_path>" << std::endl;
@@ -34,7 +38,13 @@ int main(int argc, char **argv) {
     std::cout << "smartBridge.username = " << lutronBridge->getUserName() << std::endl;
     std::cout << "smartBridge.password = " << lutronBridge->getPassword() << std::endl;
 
+    lutronBridge->setCallback(lutronMessage);
     lutronBridge->connect();
+    lutronBridge->sendCommand("?OUTPUT,3");
+    lutronBridge->sendCommand("?OUTPUT,3,1");
+    lutronBridge->sendCommand("#OUTPUT,3,1,50,00:00");
+    lutronBridge->sendCommand("#OUTPUT,3,1,01,00:00");
+    lutronBridge->sendCommand("?OUTPUT,3,1");
 
     pause();
 

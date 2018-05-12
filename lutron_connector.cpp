@@ -11,6 +11,7 @@
 
 static const char promptLogin[] = "login: ";
 static const char promptPassword[] = "password: ";
+static const char promptCommand[] = "GNET> ";
 
 LutronConnector::LutronConnector(const char *host, int port, const char *user, const char *pass) {
     this->port = port;
@@ -24,9 +25,14 @@ LutronConnector::LutronConnector(const char *host, int port, const char *user, c
     strncpy(password, pass, sizeof(password));
     password[sizeof(password)-1] = 0;
 
+    callback = nullptr;
     sockfd = -1;
     telnet = nullptr;
     joinRX = false;
+    doLogin = true;
+    doPassword = true;
+    ready = false;
+    connected = false;
     mutex = PTHREAD_MUTEX_INITIALIZER;
 }
 
@@ -41,16 +47,30 @@ LutronConnector::~LutronConnector() {
     pthread_mutex_unlock(&mutex);
 }
 
+void LutronConnector::setCallback(callback_t callback) {
+    this->callback = callback;
+}
+
 bool LutronConnector::disconnect() {
     pthread_mutex_lock(&mutex);
+
+    pthread_mutex_lock(&mutexSend);
+    connected = false;
+    pthread_cond_broadcast(&condSend);
+    pthread_mutex_unlock(&mutexSend);
+
     telnet_free(telnet);
     close(sockfd);
     sockfd = -1;
+
     pthread_mutex_unlock(&mutex);
 }
 
 bool LutronConnector::connect() {
     pthread_mutex_lock(&mutex);
+    ready = false;
+    connected = false;
+
     if(joinRX) {
         pthread_join(threadRX, nullptr);
         joinRX = false;
@@ -104,9 +124,16 @@ bool LutronConnector::connect() {
     doLogin = true;
     doPassword = true;
     joinRX = true;
+    connected = true;
     pthread_create(&threadRX, nullptr, doRX, this);
     pthread_mutex_unlock(&mutex);
-    return true;
+
+    pthread_mutex_lock(&mutexSend);
+    while(connected && !ready) {
+        pthread_cond_wait(&condSend, &mutexSend);
+    }
+    pthread_mutex_unlock(&mutexSend);
+    return connected;
 }
 
 void* LutronConnector::doRX(void *context) {
@@ -227,11 +254,58 @@ void LutronConnector::recv(const char *data, size_t len) {
         return;
     }
 
-    std::cout.write(data, len);
-    std::cout << std::endl;
+    std::string temp;
+    size_t next = 0;
+    for(;;) {
+        while(next < len && data[next] != '\r' && data[next] != '\n') {
+            next++;
+        }
+
+        temp.assign(data, next);
+        if(temp == promptLogin) {
+            std::cerr << "[LutronConnector] login rejected" << std::endl;
+            disconnect();
+        }
+        else if(temp == promptCommand) {
+            std::cerr << "[LutronConnector] ready" << std::endl;
+
+            // notify any blocked senders
+            pthread_mutex_lock(&mutexSend);
+            ready = true;
+            pthread_cond_signal(&condSend);
+            pthread_mutex_unlock(&mutexSend);
+        }
+        else {
+            std::cerr << "[LutronConnector] recv " << temp << std::endl;
+            if(callback) (*callback)(temp.c_str());
+        }
+
+        while(next < len && (data[next] == '\r' || data[next] == '\n')) {
+            next++;
+        }
+        if(next >= len) break;
+        data += next;
+        len -= next;
+        next = 0;
+    }
 }
 
-void LutronConnector::sendCommand(const char *data, size_t len) {
-    telnet_send(telnet, data, len);
+bool LutronConnector::sendCommand(const char *cmd) {
+    pthread_mutex_lock(&mutexSend);
+    while(connected && !ready) {
+        pthread_cond_wait(&condSend, &mutexSend);
+    }
+    ready = false;
+
+    if(!connected) {
+        pthread_mutex_unlock(&mutexSend);
+        return false;
+    }
+
+    std::cerr << "[LutronConnector] send " << cmd << std::endl;
+    telnet_send(telnet, cmd, strlen(cmd));
     telnet_send(telnet, "\r\n", 2);
+
+    pthread_mutex_unlock(&mutexSend);
+    return true;
 }

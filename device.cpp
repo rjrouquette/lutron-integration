@@ -107,6 +107,8 @@ device* device::parse(json_object *object, std::map<std::string, room *> &rooms)
         return new device_dimmer(id, name, desc, type, loc);
     else if(type == wall_switch || type == plugin_switch)
         return new device_switch(id, name, desc, type, loc);
+    else if(type == pico_remote)
+        return new device_remote(id, name, desc, type, loc);
     else
         return new device(id, name, desc, type, loc);
 }
@@ -147,7 +149,7 @@ void device_dimmer::processMessage(const char *command, const char **fields, int
 
 
 device_switch::device_switch(int id, const char *name, const char *desc, device_type type, room *loc) :
-        device(id, name, desc, type, loc)
+device(id, name, desc, type, loc)
 {
 
 }
@@ -165,6 +167,57 @@ void device_switch::processMessage(const char *command, const char **fields, int
             sscanf(fields[1], "%f", &temp);
             state = temp >= 50;
             log_notice("update `%s` set `state` = %s", name.c_str(), state?"on":"off");
+        }
+    }
+}
+
+
+
+
+static const char *str_button[] = {
+        "invalid",
+        "unknown",
+        "on",
+        "favorite",
+        "off",
+        "up",
+        "down"
+};
+
+device_remote::device_remote(int id, const char *name, const char *desc, device_type type, room *loc) :
+device(id, name, desc, type, loc)
+{
+
+}
+
+void device_remote::addListener(listener *l) {
+    listeners.insert(l);
+}
+
+void device_remote::removeListener(listener *l) {
+    listeners.erase(l);
+}
+
+void device_remote::requestRefresh() const {
+    // do nothing
+}
+
+void device_remote::processMessage(const char *command, const char **fields, int fcnt) {
+    if(strcmp(command, "DEVICE") == 0) {
+        auto button = (button_t) atoi(fields[0]);
+        int event = atoi(fields[1]);
+
+        if(event == 3) {
+            log_notice("event `%s` button `%s` pressed", name.c_str(), str_button[button]);
+            for(auto l : listeners) {
+                l->buttonEvent(this, button, true);
+            }
+        }
+        else if(event == 4) {
+            log_notice("event `%s` button `%s` released", name.c_str(), str_button[button]);
+            for(auto l : listeners) {
+                l->buttonEvent(this, button, false);
+            }
         }
     }
 }

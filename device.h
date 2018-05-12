@@ -8,6 +8,7 @@
 #include <string>
 #include <map>
 #include <json-c/json_object.h>
+#include <set>
 
 class LutronConnector;
 class room;
@@ -63,6 +64,37 @@ public:
 
     void requestRefresh() const override;
     void processMessage(const char *command, const char **fields, int fcnt) override;
+};
+
+class device_remote : public device {
+public:
+    enum button_t {
+        invalid,
+        unknown,
+        on,
+        favorite,
+        off,
+        up,
+        down
+    };
+
+    class listener {
+    public:
+        virtual void buttonEvent(device_remote *dev, button_t button, bool state) = 0;
+    };
+
+    device_remote(int id, const char *name, const char *desc, device_type type, room *loc);
+    ~device_remote() override = default;
+
+    void requestRefresh() const override;
+    void processMessage(const char *command, const char **fields, int fcnt) override;
+
+    void addListener(listener *l);
+    void removeListener(listener *l);
+
+private:
+    std::set<listener *> listeners;
+
 };
 
 #endif //LUTRON_INTEGRATION_DEVICE_H

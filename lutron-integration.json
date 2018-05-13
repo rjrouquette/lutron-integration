@@ -101,6 +101,20 @@
       "type": "pico_remote",
       "room": "master_bedroom",
       "buttons": [ 2, 3, 4, 5, 6]
+    },{
+      "id": 12,
+      "name": "den_lamps",
+      "description": "Table Lamps",
+      "type": "plugin_dimmer",
+      "room": "den",
+      "buttons": [ 2, 4, 5, 6]
+    },{
+      "id": 13,
+      "name": "den_lamps_pico",
+      "description": "Table Lamps Remote",
+      "type": "pico_remote",
+      "room": "den",
+      "buttons": [ 2, 3, 4, 5, 6]
     }
   ],
   "rooms": [
@@ -116,6 +130,9 @@
     },{
       "name": "hallway",
       "description": "Hallway"
+    },{
+      "name": "den",
+      "description": "Den"
     },{
       "name": "attic",
       "description": "Attic"

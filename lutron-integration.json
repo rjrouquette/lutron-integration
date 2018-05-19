@@ -115,6 +115,20 @@
       "type": "pico_remote",
       "room": "den",
       "buttons": [ 2, 3, 4, 5, 6]
+    },{
+      "id": 14,
+      "name": "solarium_cafe_lights",
+      "description": "Cafe Lights",
+      "type": "plugin_dimmer",
+      "room": "solarium",
+      "buttons": [ 2, 4, 5, 6]
+    },{
+      "id": 15,
+      "name": "solarium_cafe_lights_pico",
+      "description": "Cafe Lights Remote",
+      "type": "pico_remote",
+      "room": "solarium",
+      "buttons": [ 2, 3, 4, 5, 6]
     }
   ],
   "rooms": [
@@ -136,6 +150,9 @@
     },{
       "name": "attic",
       "description": "Attic"
+    },{
+      "name": "solarium",
+      "description": "Solarium"
     }
   ]
 }

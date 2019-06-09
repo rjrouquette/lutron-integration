@@ -1,12 +1,7 @@
 {
   "server": {
-    "listen": "0.0.0.0",
-    "port": 8765,
-    "maxConnections": 16,
-    "keyHost": "demo.key",
-    "keyRSA": "demo.rsa",
-    "keyDSA": "demo.dsa",
-    "authorizedKeys": {}
+    "listen": "localhost",
+    "port": 8765
   },
   "smartBridge": {
     "host": "192.168.3.207",

@@ -25,7 +25,6 @@ add_executable(
 
 target_link_libraries(
         lutron-integration
-        -lssh
         -ljson-c
         -pthread
 )

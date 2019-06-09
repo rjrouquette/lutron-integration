@@ -1,8 +1,7 @@
-#include <libssh/libssh.h>
-#include <libssh/server.h>
 #include <json-c/json.h>
 #include <pthread.h>
 #include <cstdlib>
+#include <unistd.h>
 #include <sysexits.h>
 #include <map>
 #include <cstring>

@@ -13,7 +13,13 @@ static const char promptLogin[] = "login: ";
 static const char promptPassword[] = "password: ";
 static const char promptCommand[] = "GNET> ";
 
-LutronConnector::LutronConnector(const char *host, int port, const char *user, const char *pass) {
+LutronConnector::LutronConnector(const char *host, int port, const char *user, const char *pass) :
+    hostname{0}, username{0}, password{0}, threadRX{},
+    mutex(PTHREAD_MUTEX_INITIALIZER),
+    mutexSend(PTHREAD_MUTEX_INITIALIZER),
+    condResponse(PTHREAD_COND_INITIALIZER),
+    condSend(PTHREAD_COND_INITIALIZER)
+{
     this->port = port;
 
     strncpy(hostname, host, sizeof(hostname));
@@ -33,9 +39,6 @@ LutronConnector::LutronConnector(const char *host, int port, const char *user, c
     doPassword = true;
     ready = false;
     connected = false;
-    mutex = PTHREAD_MUTEX_INITIALIZER;
-    condSend = PTHREAD_COND_INITIALIZER;
-    condResponse = PTHREAD_COND_INITIALIZER;
 }
 
 LutronConnector::~LutronConnector() {
@@ -145,6 +148,8 @@ void* LutronConnector::doRX(void *context) {
 
     while(ctx->sockfd >= 0) {
         if ((rs = ::recv(ctx->sockfd, buffer, sizeof(buffer), 0)) > 0) {
+            buffer[rs] = 0;
+            log_debug("rx: %s", buffer);
             telnet_recv(ctx->telnet, buffer, (size_t)rs);
         } else if (rs == 0) {
             break;
@@ -216,6 +221,10 @@ void LutronConnector::send(const char *data, size_t len) {
 
     /* send data */
     while (len > 0) {
+        char temp[256];
+        memcpy(temp, data, len);
+        temp[len] = 0;
+        log_debug("tx: %s", temp);
         if ((rs = ::send(sockfd, data, len, 0)) == -1) {
             log_error("smart bridge send() failed: %s", strerror(errno));
             disconnect();

@@ -9,7 +9,7 @@
     "authorizedKeys": {}
   },
   "smartBridge": {
-    "host": "192.168.1.207",
+    "host": "192.168.3.207",
     "port": 23,
     "user": "lutron",
     "password": "integration"

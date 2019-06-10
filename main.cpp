@@ -11,6 +11,8 @@
 #include "room.h"
 #include "logging.h"
 
+#define UNUSED __attribute__((unused))
+
 std::map<int, device *> devices;
 std::map<std::string, device *> deviceNames;
 std::map<std::string, room *> rooms;
@@ -27,7 +29,7 @@ bool loadConfigurationRooms(json_object *jRooms);
 bool loadConfigurationDevices(json_object *jDevices);
 bool loadConfigurationService(json_object *jService);
 
-static void *doUdpRx(void *);
+static void *doUdpRx(void *obj);
 static json_object* processRequest(json_object *request);
 
 void lutronMessage(const char *msg) {
@@ -55,7 +57,7 @@ void lutronMessage(const char *msg) {
         return;
     }
 
-    int devId = atoi(fields[1]);
+    int devId = (int)strtol(fields[1], nullptr, 10);
     auto dev = devices.find(devId);
     if(dev == devices.end()) {
         log_error("received system message for unknown device: %s", msg);
@@ -65,7 +67,7 @@ void lutronMessage(const char *msg) {
     dev->second->processMessage(fields[0], ((const char**)fields)+2, f-2);
 }
 
-void sig_ignore(int sig) {}
+void sig_ignore(UNUSED int sig) {}
 
 int main(int argc, char **argv) {
     struct sigaction act = {};
@@ -325,7 +327,7 @@ bool loadConfigurationService(json_object *jService) {
     return true;
 }
 
-static void *doUdpRx(void *) {
+static void *doUdpRx(UNUSED void *obj) {
     auto tokener = json_tokener_new_ex(8);
     sockaddr_in remoteAddr = {};
     socklen_t addrLen;

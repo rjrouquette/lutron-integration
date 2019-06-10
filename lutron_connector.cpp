@@ -54,8 +54,8 @@ LutronConnector::~LutronConnector() {
     pthread_mutex_unlock(&mutex);
 }
 
-void LutronConnector::setCallback(callback_t callback) {
-    this->callback = callback;
+void LutronConnector::setCallback(callback_t cb) {
+    this->callback = cb;
 }
 
 bool LutronConnector::disconnect() {
@@ -71,6 +71,7 @@ bool LutronConnector::disconnect() {
     sockfd = -1;
 
     pthread_mutex_unlock(&mutex);
+    return true;
 }
 
 bool LutronConnector::connect() {

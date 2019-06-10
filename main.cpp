@@ -351,6 +351,7 @@ static void *doUdpRx(UNUSED void *obj) {
         }
     }
 
+    json_tokener_free(tokener);
     return nullptr;
 }
 

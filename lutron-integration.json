@@ -1,6 +1,6 @@
 {
-  "server": {
-    "listen": "localhost",
+  "service": {
+    "address": "localhost",
     "port": 8765
   },
   "smartBridge": {

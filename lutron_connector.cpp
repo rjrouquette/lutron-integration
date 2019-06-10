@@ -6,6 +6,7 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <zconf.h>
+#include <csignal>
 #include "lutron_connector.h"
 #include "logging.h"
 
@@ -47,6 +48,7 @@ LutronConnector::~LutronConnector() {
         disconnect();
     }
     if(joinRX) {
+        pthread_kill(threadRX, SIGINT);
         pthread_join(threadRX, nullptr);
     }
     pthread_mutex_unlock(&mutex);
@@ -152,7 +154,9 @@ void* LutronConnector::doRX(void *context) {
         } else if (rs == 0) {
             break;
         } else {
-            log_error("smart bridge recv() failed: %s", strerror(errno));
+            if(errno != EINTR) {
+                log_error("smart bridge recv() failed: %s", strerror(errno));
+            }
             break;
         }
     }

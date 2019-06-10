@@ -5,6 +5,8 @@
 #include <sysexits.h>
 #include <map>
 #include <cstring>
+#include <netdb.h>
+#include <csignal>
 #include "lutron_connector.h"
 #include "room.h"
 #include "logging.h"
@@ -15,10 +17,18 @@ std::map<std::string, room *> rooms;
 
 LutronConnector *lutronBridge;
 
+bool isRunning = true;
+int socketUdp = -1;
+pthread_t threadRx;
+
 bool loadConfiguration(json_object *config);
 bool loadConfigurationBridge(json_object *config);
-bool loadConfigurationRooms(json_object *jrooms);
-bool loadConfigurationDevices(json_object *jdevices);
+bool loadConfigurationRooms(json_object *jRooms);
+bool loadConfigurationDevices(json_object *jDevices);
+bool loadConfigurationService(json_object *jService);
+
+static void *doUdpRx(void *);
+static json_object* processRequest(json_object *request);
 
 void lutronMessage(const char *msg) {
     char temp[256];
@@ -55,7 +65,15 @@ void lutronMessage(const char *msg) {
     dev->second->processMessage(fields[0], ((const char**)fields)+2, f-2);
 }
 
+void sig_ignore(int sig) {}
+
 int main(int argc, char **argv) {
+    struct sigaction act = {};
+    memset(&act, 0, sizeof(act));
+    act.sa_handler = sig_ignore;
+    sigaction(SIGINT, &act, nullptr);
+    sigaction(SIGTERM, &act, nullptr);
+
     if(argc != 2) {
         log_notice("Usage: lutron-integration <config_json_path>");
         return EX_USAGE;
@@ -86,6 +104,9 @@ int main(int argc, char **argv) {
     lutronBridge->connect();
     log_notice("smart bridge connection ready");
 
+    log_notice("start udp rx thread");
+    pthread_create(&threadRx, nullptr, doUdpRx, nullptr);
+
     // update all device states
     log_notice("requesting current device states");
     for(auto &dev : devices) {
@@ -99,9 +120,18 @@ int main(int argc, char **argv) {
     //lutronBridge->sendCommand("?OUTPUT,3,1");
 
     pause();
+    isRunning = false;
+    log_notice("shutting down");
 
+    log_notice("disconnect from smart bridge");
     lutronBridge->disconnect();
     delete lutronBridge;
+
+    pthread_kill(threadRx, SIGINT);
+    pthread_join(threadRx, nullptr);
+    log_notice("udp rx thread stopped");
+
+    close(socketUdp);
     return 0;
 }
 
@@ -138,6 +168,16 @@ bool loadConfiguration(json_object *config) {
         return false;
     }
 
+    if(json_object_object_get_ex(config, "service", &jtmp)) {
+        if(!loadConfigurationService(jtmp)) {
+            return false;
+        }
+    }
+    else {
+        log_error("configuration file is missing `service` section");
+        return false;
+    }
+
     return true;
 }
 
@@ -170,13 +210,13 @@ bool loadConfigurationBridge(json_object *config) {
     return true;
 }
 
-bool loadConfigurationRooms(json_object *jrooms) {
+bool loadConfigurationRooms(json_object *jRooms) {
     json_object *jroom, *jtmp;
     const char *name, *desc;
 
-    int len = json_object_array_length(jrooms);
+    int len = json_object_array_length(jRooms);
     for(int i = 0; i < len; i++) {
-        jroom = json_object_array_get_idx(jrooms, i);
+        jroom = json_object_array_get_idx(jRooms, i);
 
         if(json_object_object_get_ex(jroom, "name", &jtmp)) {
             name = json_object_get_string(jtmp);
@@ -207,13 +247,13 @@ bool loadConfigurationRooms(json_object *jrooms) {
     return true;
 }
 
-bool loadConfigurationDevices(json_object *jdevices) {
+bool loadConfigurationDevices(json_object *jDevices) {
     json_object *jdev;
     device *dev;
 
-    int len = json_object_array_length(jdevices);
+    int len = json_object_array_length(jDevices);
     for(int i = 0; i < len; i++) {
-        jdev = json_object_array_get_idx(jdevices, i);
+        jdev = json_object_array_get_idx(jDevices, i);
         dev = device::parse(jdev, rooms);
         if(dev == nullptr) {
             return false;
@@ -234,4 +274,84 @@ bool loadConfigurationDevices(json_object *jdevices) {
     }
 
     return true;
+}
+
+bool loadConfigurationService(json_object *jService) {
+    json_object *jtmp;
+    std::string bindAddress;
+    int bindPort;
+
+    if(json_object_object_get_ex(jService, "address", &jtmp)) {
+        bindAddress = json_object_get_string(jtmp);
+    }
+    else {
+        log_error("`service` section is missing `address`");
+        return false;
+    }
+
+    if(json_object_object_get_ex(jService, "port", &jtmp)) {
+        bindPort = json_object_get_int(jtmp);
+    }
+    else {
+        log_error("`service` section is missing `port`");
+        return false;
+    }
+
+    struct hostent *server = gethostbyname(bindAddress.c_str());
+    if(!server) {
+        log_error("could not resolve bind address: %s", bindAddress.c_str());
+        return false;
+    }
+
+    sockaddr_in sockAddr = {};
+    bzero(&sockAddr, sizeof(sockAddr));
+    sockAddr.sin_family = AF_INET;
+    memcpy(&sockAddr.sin_addr.s_addr, server->h_addr, (size_t)server->h_length);
+    sockAddr.sin_port = htons(bindPort);
+
+    socketUdp = socket(AF_INET, SOCK_DGRAM, 0);
+    if(socketUdp < 0) {
+        log_error("failed to create socket");
+        return false;
+    }
+
+    if (bind(socketUdp, (struct sockaddr *) &sockAddr, sizeof(sockAddr)) < 0) {
+        log_error("ERROR on socket binding! %s (%d)", strerror(errno), errno);
+        close(socketUdp);
+        return EX_CANTCREAT;
+    }
+
+    log_notice("listening on %s:%d", bindAddress.c_str(), bindPort);
+    return true;
+}
+
+static void *doUdpRx(void *) {
+    auto tokener = json_tokener_new_ex(8);
+    sockaddr_in remoteAddr = {};
+    socklen_t addrLen;
+    char buffer[65536];
+
+    // strict parsing only
+    json_tokener_set_flags(tokener, JSON_TOKENER_STRICT);
+
+    while(isRunning && socketUdp >= 0) {
+        bzero(&remoteAddr, sizeof(remoteAddr));
+        addrLen = sizeof(remoteAddr);
+        ssize_t r = recvfrom(socketUdp, buffer, sizeof(buffer), 0, (struct sockaddr *) &remoteAddr, &addrLen);
+        if(r > 0) {
+            auto request = json_tokener_parse_ex(tokener, buffer, (int)r);
+            auto response = processRequest(request);
+            json_object_put(request);
+
+            auto responseStr = json_object_to_json_string_ext(response, JSON_C_TO_STRING_PLAIN);
+            sendto(socketUdp, responseStr, strlen(responseStr), 0, (struct sockaddr *) &remoteAddr, sizeof(remoteAddr));
+            json_object_put(request);
+        }
+    }
+
+    return nullptr;
+}
+
+static json_object* processRequest(json_object *request) {
+    return nullptr;
 }

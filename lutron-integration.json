@@ -149,5 +149,69 @@
       "name": "solarium",
       "description": "Solarium"
     }
+  ],
+  "schedule": [
+    {
+      "timeOfDay": "08:00:00",
+      "actions": [
+        { "device": "living_room_lamps", "level": "off" }
+      ]
+    },{
+      "timeOfDay": "18:00:00",
+      "actions": [
+        { "device": "kitchen_ceiling", "level": "off" },
+        { "device": "kitchen_pendant", "raiseTo": "on" },
+        { "device": "master_bedroom_lamp", "raiseTo":  "on" },
+        { "device": "living_room_lamps", "raiseTo":  "on" }
+      ]
+    },{
+      "timeOfDay": "20:00:00",
+      "actions": [
+        { "device": "kitchen_pendant", "lowerTo": 75 },
+        { "device": "kitchen_pendant", "lowerTo": 75 }
+      ]
+    },{
+      "timeOfDay": "21:00:00",
+      "actions": [
+        { "device": "kitchen_pendant", "lowerTo": 50 },
+        { "device": "living_room_lamps", "lowerTo": 50 }
+      ]
+    },{
+      "timeOfDay": "22:00:00",
+      "actions": [
+        { "device": "kitchen_pendant", "lowerTo": 25 },
+        { "device": "living_room_lamps", "lowerTo": 25 }
+      ]
+    },{
+      "timeOfDay": "00:00:00",
+      "actions": [
+        { "device": "kitchen_pendant", "level": "off" },
+        { "device": "hallway_ceiling", "level": "off" },
+        { "device": "living_room_lamps", "lowerTo": 1 }
+      ]
+    }
+  ],
+  "overrides": [
+    {
+      "timeStart": "18:00:00",
+      "timeStop": "06:00:00",
+      "triggers": [
+        {"device": "kitchen_ceiling", "event": "buttonOnPress"}
+      ],
+      "actions": [
+        { "device": "kitchen_ceiling", "level": "off" },
+        { "device": "kitchen_pendant", "pressButton":  "on" }
+      ]
+    },{
+      "timeStart": "18:00:00",
+      "timeStop": "06:00:00",
+      "triggers": [
+        {"device": "kitchen_ceiling", "event": "buttonOnRelease"}
+      ],
+      "actions": [
+        { "device": "kitchen_ceiling", "level": "off" },
+        { "device": "kitchen_pendant", "releaseButton":  "on" }
+      ]
+    }
   ]
 }

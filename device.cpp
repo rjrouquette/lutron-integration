@@ -261,9 +261,9 @@ void device_switch::setState(bool s) {
 
     char cmd[32];
     if(state)
-        sprintf(cmd, "#OUTPUT,%d,1,0,00:00", id);
+        sprintf(cmd, "#OUTPUT,%d,1,100", id);
     else
-        sprintf(cmd, "#OUTPUT,%d,1,100,00:00", id);
+        sprintf(cmd, "#OUTPUT,%d,1,0", id);
 
     conn->sendCommand(cmd);
 }

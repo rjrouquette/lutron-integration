@@ -16,13 +16,28 @@ class room;
 class device {
 public:
     enum device_type {
-        invalid,
+        invalid_type,
         smart_bridge,
         wall_dimmer,
         plugin_dimmer,
         pico_remote,
         wall_switch,
         plugin_switch
+    };
+
+    enum button_t {
+        invalid_button,
+        unknown,
+        on,
+        favorite,
+        off,
+        up,
+        down
+    };
+
+    class listener {
+    public:
+        virtual void buttonEvent(device *dev, button_t button, bool state) = 0;
     };
 
     LutronConnector *conn;
@@ -40,6 +55,16 @@ public:
 
     virtual void requestRefresh() const;
     virtual void processMessage(const char *command, const char **fields, int fcnt);
+
+    virtual void setOn();
+    virtual void setOff();
+
+    void addListener(listener *l);
+    void removeListener(listener *l);
+
+private:
+    std::set<listener *> listeners;
+
 };
 
 class device_dimmer : public device {
@@ -53,8 +78,11 @@ public:
     void requestRefresh() const override;
     void processMessage(const char *command, const char **fields, int fcnt) override;
 
+    void setOn() override;
+    void setOff() override;
+
     float getLevel() const;
-    void setLevel(float level);
+    void setLevel(float level, int fade);
 };
 
 class device_switch : public device {
@@ -68,39 +96,20 @@ public:
     void requestRefresh() const override;
     void processMessage(const char *command, const char **fields, int fcnt) override;
 
+    void setOn() override;
+    void setOff() override;
+
     bool getState() const;
     void setState(bool state);
 };
 
 class device_remote : public device {
 public:
-    enum button_t {
-        invalid,
-        unknown,
-        on,
-        favorite,
-        off,
-        up,
-        down
-    };
-
-    class listener {
-    public:
-        virtual void buttonEvent(device_remote *dev, button_t button, bool state) = 0;
-    };
-
     device_remote(int id, const char *name, const char *desc, device_type type, room *loc);
     ~device_remote() override = default;
 
     void requestRefresh() const override;
     void processMessage(const char *command, const char **fields, int fcnt) override;
-
-    void addListener(listener *l);
-    void removeListener(listener *l);
-
-private:
-    std::set<listener *> listeners;
-
 };
 
 #endif //LUTRON_INTEGRATION_DEVICE_H

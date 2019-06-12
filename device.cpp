@@ -19,6 +19,16 @@ static const char *str_dtype[7] = {
         "plugin_switch"
 };
 
+static const char *str_button[] = {
+        "invalid",
+        "unknown",
+        "on",
+        "favorite",
+        "off",
+        "up",
+        "down"
+};
+
 device::device(int i, const char *n, const char *d, device_type t, room *l) :
 id(i), name(n), description(d), type(t), location(l)
 {
@@ -67,14 +77,14 @@ device* device::parse(json_object *object, std::map<std::string, room *> &rooms)
 
     if(json_object_object_get_ex(object, "type", &jtmp)) {
         const char *temp = json_object_get_string(jtmp);
-        type = invalid;
+        type = invalid_type;
         for(int i = 0; i < sizeof(str_dtype)/sizeof(const char *); i++) {
             if(strcmp(temp, str_dtype[i]) == 0) {
                 type = (device_type)i;
                 break;
             }
         }
-        if(type == invalid) {
+        if(type == invalid_type) {
             log_error("device entry `type` is invalid: %s", temp);
             return nullptr;
         }
@@ -119,7 +129,37 @@ void device::requestRefresh() const {
 }
 
 void device::processMessage(const char *command, const char **fields, int fcnt) {
-    // do nothing by default
+    // process button events
+    if(fcnt < 2) return;
+    if(strcmp(command, "DEVICE") == 0) {
+        auto button = (button_t) atoi(fields[0]);
+        int event = atoi(fields[1]);
+
+        if(event == 3) {
+            log_notice("event `%s` button `%s` pressed", name.c_str(), str_button[button]);
+            for(auto l : listeners) {
+                l->buttonEvent(this, button, true);
+            }
+        }
+        else if(event == 4) {
+            log_notice("event `%s` button `%s` released", name.c_str(), str_button[button]);
+            for(auto l : listeners) {
+                l->buttonEvent(this, button, false);
+            }
+        }
+    }
+}
+
+void device::setOff() {}
+
+void device::setOn() {}
+
+void device::addListener(listener *l) {
+    listeners.insert(l);
+}
+
+void device::removeListener(listener *l) {
+    listeners.erase(l);
 }
 
 
@@ -137,6 +177,8 @@ void device_dimmer::requestRefresh() const {
 }
 
 void device_dimmer::processMessage(const char *command, const char **fields, int fcnt) {
+    device::processMessage(command, fields, fcnt);
+
     if(strcmp(command, "OUTPUT") == 0) {
         if(strcmp(fields[0], "1") == 0) {
             sscanf(fields[1], "%f", &level);
@@ -145,11 +187,19 @@ void device_dimmer::processMessage(const char *command, const char **fields, int
     }
 }
 
+void device_dimmer::setOn() {
+    setLevel(100, 1);
+}
+
+void device_dimmer::setOff() {
+    setLevel(0, 1);
+}
+
 float device_dimmer::getLevel() const {
     return level;
 }
 
-void device_dimmer::setLevel(float l) {
+void device_dimmer::setLevel(float l, int fade) {
     if(std::isnan(l)) l = 0;
     if(l < 0) l = 0;
     if(l > 100.0) l = 100.0;
@@ -157,7 +207,12 @@ void device_dimmer::setLevel(float l) {
     level = l;
     log_notice("update `%s` set `level` = %0.02f", name.c_str(), level);
 
-    // TODO send command
+    if(fade < 0) fade = 0;
+    if(fade > 3599) fade = 3599;
+    int m = fade / 60;
+    int s = fade % 60;
+    char cmd[32];
+    sprintf(cmd, "#OUTPUT,%d,1,%0.2f,%02d:%02d", id, level, m, s);
 }
 
 
@@ -176,6 +231,8 @@ void device_switch::requestRefresh() const {
 }
 
 void device_switch::processMessage(const char *command, const char **fields, int fcnt) {
+    device::processMessage(command, fields, fcnt);
+
     if(strcmp(command, "OUTPUT") == 0) {
         if(strcmp(fields[0], "1") == 0) {
             float temp;
@@ -186,6 +243,14 @@ void device_switch::processMessage(const char *command, const char **fields, int
     }
 }
 
+void device_switch::setOn() {
+    setState(true);
+}
+
+void device_switch::setOff() {
+    setState(false);
+}
+
 bool device_switch::getState() const {
     return state;
 }
@@ -194,21 +259,17 @@ void device_switch::setState(bool s) {
     state = s;
     log_notice("update `%s` set `state` = %s", name.c_str(), state?"on":"off");
 
-    // TODO send command
+    char cmd[32];
+    if(state)
+        sprintf(cmd, "#OUTPUT,%d,1,0,00:00", id);
+    else
+        sprintf(cmd, "#OUTPUT,%d,1,100,00:00", id);
+
+    conn->sendCommand(cmd);
 }
 
 
 
-
-static const char *str_button[] = {
-        "invalid",
-        "unknown",
-        "on",
-        "favorite",
-        "off",
-        "up",
-        "down"
-};
 
 device_remote::device_remote(int id, const char *name, const char *desc, device_type type, room *loc) :
 device(id, name, desc, type, loc)
@@ -216,34 +277,10 @@ device(id, name, desc, type, loc)
 
 }
 
-void device_remote::addListener(listener *l) {
-    listeners.insert(l);
-}
-
-void device_remote::removeListener(listener *l) {
-    listeners.erase(l);
-}
-
 void device_remote::requestRefresh() const {
     // do nothing
 }
 
 void device_remote::processMessage(const char *command, const char **fields, int fcnt) {
-    if(strcmp(command, "DEVICE") == 0) {
-        auto button = (button_t) atoi(fields[0]);
-        int event = atoi(fields[1]);
-
-        if(event == 3) {
-            log_notice("event `%s` button `%s` pressed", name.c_str(), str_button[button]);
-            for(auto l : listeners) {
-                l->buttonEvent(this, button, true);
-            }
-        }
-        else if(event == 4) {
-            log_notice("event `%s` button `%s` released", name.c_str(), str_button[button]);
-            for(auto l : listeners) {
-                l->buttonEvent(this, button, false);
-            }
-        }
-    }
+    device::processMessage(command, fields, fcnt);
 }

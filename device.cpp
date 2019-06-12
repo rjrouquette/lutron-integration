@@ -3,6 +3,7 @@
 //
 
 #include <cstring>
+#include <cmath>
 #include "device.h"
 #include "room.h"
 #include "lutron_connector.h"
@@ -126,7 +127,7 @@ void device::processMessage(const char *command, const char **fields, int fcnt) 
 device_dimmer::device_dimmer(int id, const char *name, const char *desc, device_type type, room *loc) :
 device(id, name, desc, type, loc)
 {
-
+    level = 0;
 }
 
 void device_dimmer::requestRefresh() const {
@@ -144,6 +145,20 @@ void device_dimmer::processMessage(const char *command, const char **fields, int
     }
 }
 
+float device_dimmer::getLevel() const {
+    return level;
+}
+
+void device_dimmer::setLevel(float l) {
+    if(std::isnan(l)) l = 0;
+    if(l < 0) l = 0;
+    if(l > 100.0) l = 100.0;
+
+    level = l;
+    log_notice("update `%s` set `level` = %0.02f", name.c_str(), level);
+
+    // TODO send command
+}
 
 
 
@@ -151,7 +166,7 @@ void device_dimmer::processMessage(const char *command, const char **fields, int
 device_switch::device_switch(int id, const char *name, const char *desc, device_type type, room *loc) :
 device(id, name, desc, type, loc)
 {
-
+    state = false;
 }
 
 void device_switch::requestRefresh() const {
@@ -169,6 +184,17 @@ void device_switch::processMessage(const char *command, const char **fields, int
             log_notice("update `%s` set `state` = %s", name.c_str(), state?"on":"off");
         }
     }
+}
+
+bool device_switch::getState() const {
+    return state;
+}
+
+void device_switch::setState(bool s) {
+    state = s;
+    log_notice("update `%s` set `state` = %s", name.c_str(), state?"on":"off");
+
+    // TODO send command
 }
 
 

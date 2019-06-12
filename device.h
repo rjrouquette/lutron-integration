@@ -52,6 +52,9 @@ public:
 
     void requestRefresh() const override;
     void processMessage(const char *command, const char **fields, int fcnt) override;
+
+    float getLevel() const;
+    void setLevel(float level);
 };
 
 class device_switch : public device {
@@ -64,6 +67,9 @@ public:
 
     void requestRefresh() const override;
     void processMessage(const char *command, const char **fields, int fcnt) override;
+
+    bool getState() const;
+    void setState(bool state);
 };
 
 class device_remote : public device {

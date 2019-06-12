@@ -32,6 +32,8 @@ bool loadConfigurationService(json_object *jService);
 static void *doUdpRx(void *obj);
 static json_object* processRequest(json_object *request);
 
+static json_object* doStatus(json_object *request);
+
 void lutronMessage(const char *msg) {
     char temp[256];
     strncpy(temp, msg, 255);
@@ -356,5 +358,72 @@ static void *doUdpRx(UNUSED void *obj) {
 }
 
 static json_object* processRequest(json_object *request) {
-    return nullptr;
+    json_object *jAction;
+    if(!json_object_object_get_ex(request, "action", &jAction)) return nullptr;
+    auto action = json_object_get_string(jAction);
+
+    if(strcmp(action, "status") == 0){
+        return doStatus(request);
+    }
+
+    auto response = json_object_new_object();
+    json_object_object_add(response, "error", json_object_new_string("invalid action"));
+    return response;
+}
+
+static json_object* doStatus(json_object *request) {
+    json_object *jList, *jtmp;
+    std::set<device *> statDevices;
+
+    // check for list of rooms
+    if(json_object_object_get_ex(request, "rooms", &jList)) {
+
+    }
+
+    // check for list of devices
+    if(json_object_object_get_ex(request, "devices", &jList)) {
+        int len = json_object_array_length(jList);
+        for(int i = 0; i < len; i++) {
+            device *target = nullptr;
+            jtmp = json_object_array_get_idx(jList, i);
+            if(json_object_get_type(jtmp) == json_type_int) {
+                auto d = devices.find(json_object_get_int(jtmp));
+                if(d != devices.end()) {
+                    target = d->second;
+                }
+            }
+            else {
+                auto deviceName = json_object_get_string(jtmp);
+                for (auto d : devices) {
+                    if (d.second->name == deviceName) {
+                        target = d.second;
+                        break;
+                    }
+                }
+            }
+
+            if(target != nullptr) {
+                statDevices.insert(target);
+            }
+        }
+    }
+
+    auto jDevices = json_object_new_array();
+    for(auto d : statDevices) {
+        auto jDevice = json_object_new_object();
+        json_object_object_add(jDevice, "id", json_object_new_int(d->id));
+        if(d->type == device::plugin_switch || d->type == device::wall_switch) {
+            auto sw = (device_switch *)d;
+            json_object_object_add(jDevice, "state", json_object_new_string(sw->getState() ? "on" : "off"));
+        }
+        else if(d->type == device::plugin_dimmer || d->type == device::wall_dimmer) {
+            auto sw = (device_dimmer *)d;
+            json_object_object_add(jDevice, "level", json_object_new_double(sw->getLevel()));
+        }
+    }
+
+    auto response = json_object_new_object();
+    json_object_object_add(response, "type", json_object_new_string("status"));
+    json_object_object_add(response, "devices", jDevices);
+    return response;
 }
